@@ -3,18 +3,22 @@
   choose the number of questions and difficulty, automatically advances on a correct  
   answer, shows a countdown timer, keeps focus on the input, and allows submission via the  
   Enter key.  
-*/  
+  When the challenge ends it redirects to a dedicated score screen.  
+*/
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { generateChallengeQuestion } from "@/lib/challenge";
+import { generateChallengeQuestion } from "@/lib/client/challenge";
 import { useInterval } from "react-use";
 
 export function Challenge() {
+  const router = useRouter();
+
   // --- Mode configuration ---
   const [isStarted, setIsStarted] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState(5);
@@ -39,10 +43,20 @@ export function Challenge() {
     return { q: question, a: answer };
   };
 
+  // --- Persist challenge data to localStorage ---
+  const persistChallenge = (finalScore: number, total: number) => {
+    const data = { difficulty, score: finalScore, total, questions };
+    if (typeof window !== "undefined") {
+      localStorage.setItem("lastChallenge", JSON.stringify(data));
+    }else{
+      console.log("unable to store");
+    }
+  };
+
   // --- Start the challenge ---
   const handleStart = () => {
     const qs = Array.from({ length: totalQuestions }, () => generateQuestion());
-    console.log("generate questions")
+    console.log("generate questions");
     console.dir(qs);
     setQuestions(qs);
     setCurrentIndex(0);
@@ -57,10 +71,14 @@ export function Challenge() {
   // --- Handle answer submission ---
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if(!inputRef.current?.value)
+      return;
+
     const current = questions[currentIndex];
     const userAns = parseInt((inputRef.current?.value ?? ""), 10);
-    if (userAns === current.a) {
-      setScore((s) => s + 1);
+    const isCorrect = userAns === current.a;
+    const newScore = isCorrect ? score + 1 : score;
+    if (isCorrect) {
       setFeedback("✅ Correct! Great job.");
     } else {
       setFeedback(`❌ Incorrect. The correct answer was ${current.a}.`);
@@ -70,14 +88,16 @@ export function Challenge() {
       if (currentIndex + 1 < questions.length) {
         setCurrentIndex((i) => i + 1);
         setFeedback(null);
-        if(inputRef.current)
-          inputRef.current.value = "";
+        if (inputRef.current) inputRef.current.value = "";
         inputRef.current?.focus();
       } else {
         // End of challenge
         setIsStarted(false);
+        persistChallenge(newScore, questions.length);
+        router.push(`/score`);
       }
-    }, 800);
+    }, 200);
+    setScore(newScore);
   };
 
   // --- Handle Enter key for quick submit ---
@@ -94,6 +114,8 @@ export function Challenge() {
         if (t <= 1) {
           // Time's up, end challenge
           setIsStarted(false);
+          persistChallenge(score, questions.length);
+          router.push(`/score`);
           return 0;
         }
         return t - 1;
@@ -167,13 +189,6 @@ export function Challenge() {
             )}
             <p className="mt-4 text-center">
               Time left: {timeLeft}s
-            </p>
-          </div>
-        )}
-        {!isStarted && score !== 0 && (
-          <div className="mt-6 text-center">
-            <p className="font-medium">
-              Final Score: {score} / {questions.length}
             </p>
           </div>
         )}
