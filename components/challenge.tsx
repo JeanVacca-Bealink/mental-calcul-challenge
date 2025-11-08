@@ -15,8 +15,15 @@ import { Label } from "./ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { generateChallengeQuestion } from "@/lib/client/challenge";
 import { useInterval } from "react-use";
+import { ChallengeEntry } from "@/app/actions/challenges.actions";
 
-export function Challenge() {
+export function Challenge({
+  challengeId,
+  challenge
+}: {
+  challengeId: string;
+  challenge: ChallengeEntry
+}) {
   const router = useRouter();
 
   // --- Mode configuration ---
@@ -25,10 +32,13 @@ export function Challenge() {
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("easy");
 
   // --- Challenge state ---
-  const [questions, setQuestions] = useState<Array<{ q: string; a: number }>>([]);
+  const [questions, setQuestions] = useState<Array<{ question: string; answer: number }>>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  // --- Timing state ---
+  const [startTime, setStartTime] = useState<number | null>(null);
 
   // --- Timer state ---
   const [timeLeft, setTimeLeft] = useState(0);
@@ -37,33 +47,28 @@ export function Challenge() {
   // --- Input ref for focus ---
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // --- Generate a single question based on difficulty ---
-  const generateQuestion = () => {
-    const { question, answer } = generateChallengeQuestion(difficulty);
-    return { q: question, a: answer };
-  };
-
   // --- Persist challenge data to localStorage ---
-  const persistChallenge = (finalScore: number, total: number) => {
-    const data = { difficulty, score: finalScore, total, questions };
+  const persistChallenge = (
+    finalScore: number,
+    elapsed_time: number,
+    total: number
+  ) => {
+    const data = { difficulty, score: finalScore, elapsed_time, total, questions };
     if (typeof window !== "undefined") {
       localStorage.setItem("lastChallenge", JSON.stringify(data));
-    }else{
+    } else {
       console.log("unable to store");
     }
   };
 
   // --- Start the challenge ---
   const handleStart = () => {
-    const qs = Array.from({ length: totalQuestions }, () => generateQuestion());
-    console.log("generate questions");
-    console.dir(qs);
-    setQuestions(qs);
+    setQuestions(challenge?.questions ?? Array.from({ length: totalQuestions }, () =>  generateChallengeQuestion(difficulty)))
     setCurrentIndex(0);
     setScore(0);
     setFeedback(null);
     setIsStarted(true);
-    // Set timer based on difficulty
+    setStartTime(Date.now());
     const baseTime = difficulty === "easy" ? 60 : difficulty === "medium" ? 45 : 30;
     setTimeLeft(baseTime);
   };
@@ -71,17 +76,16 @@ export function Challenge() {
   // --- Handle answer submission ---
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if(!inputRef.current?.value)
-      return;
+    if (!inputRef.current?.value) return;
 
     const current = questions[currentIndex];
     const userAns = parseInt((inputRef.current?.value ?? ""), 10);
-    const isCorrect = userAns === current.a;
+    const isCorrect = userAns === current.answer;
     const newScore = isCorrect ? score + 1 : score;
     if (isCorrect) {
       setFeedback("✅ Correct! Great job.");
     } else {
-      setFeedback(`❌ Incorrect. The correct answer was ${current.a}.`);
+      setFeedback(`❌ Incorrect. The correct answer was ${current.answer}.`);
     }
     // Advance after a short delay to show feedback
     setTimeout(() => {
@@ -93,7 +97,10 @@ export function Challenge() {
       } else {
         // End of challenge
         setIsStarted(false);
-        persistChallenge(newScore, questions.length);
+        const elapsedMs = startTime ? Date.now() - startTime : 0;
+        persistChallenge(newScore, elapsedMs, questions.length);
+        // Record leaderboard entry with nickname
+        //addLeaderboardEntry(challengeId, nickname, newScore, elapsedMs);
         router.push(`/score`);
       }
     }, 200);
@@ -114,7 +121,7 @@ export function Challenge() {
         if (t <= 1) {
           // Time's up, end challenge
           setIsStarted(false);
-          persistChallenge(score, questions.length);
+          persistChallenge(score, 0, questions.length);
           router.push(`/score`);
           return 0;
         }
@@ -170,7 +177,7 @@ export function Challenge() {
             <p className="text-center mb-2">
               Question {currentIndex + 1} / {questions.length}
             </p>
-            <p className="text-center mb-4">{questions[currentIndex].q}</p>
+            <p className="text-center mb-4">{questions[currentIndex].question}</p>
             <form onSubmit={handleSubmit} className="flex flex-col gap-2">
               <Label htmlFor="answer">Your Answer</Label>
               <Input

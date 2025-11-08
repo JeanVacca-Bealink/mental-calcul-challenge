@@ -1,18 +1,22 @@
-
-import getLeaderboard, { LeaderboardEntry } from "@/app/actions/leaderboard.actions";
+import getLeaderboard, {
+  LeaderboardEntry,
+} from "@/app/actions/leaderboard.actions";
 import { getChallengeByCode } from "@/app/actions/challenges.actions";
+import { headers } from "next/headers";
 export default async function LeaderboardPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ id: string }>;
 }) {
-    const { id: code } = await params
+  const { id: code } = await params;
+  const headersKeys = await headers();
+  console.dir(headersKeys);
+
+  const origin = new URL(headersKeys.get("referer") || `http://${headersKeys.get("host")}`).origin;
+  console.log(code);
 
   const challenge = await getChallengeByCode(code as string);
-  if (!challenge)
-    return (
-      <div>Challenge Not Found</div>
-    );
+  if (!challenge) return <div>Challenge Not Found</div>;
 
   // Fetch leaderboard entries
   const entries = await getLeaderboard(challenge?.id);
@@ -27,15 +31,13 @@ export default async function LeaderboardPage({
           <input
             type="text"
             readOnly
-            value={`${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/leaderboard/${code}`}
+            value={`${origin}/challenge/${code}`}
             className="w-full border rounded px-3 py-2 bg-muted text-sm"
           />
         </div>
       )}
 
-      <h2 className="text-2xl font-semibold mb-4">
-        Leaderboard for challenge
-      </h2>
+      <h2 className="text-2xl font-semibold mb-4">Leaderboard for challenge</h2>
 
       {entries ? (
         <table className="w-full border-collapse">

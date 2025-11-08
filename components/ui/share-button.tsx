@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -23,13 +23,18 @@ export default function ShareButton() {
     try {
       const stored = typeof window !== "undefined" ? localStorage.getItem("lastChallenge") : null;
       const challenge = stored ? JSON.parse(stored) : null;
-      
+
       if (!challenge) {
         alert("No challenge data to share.");
         return;
       }
       const res = await addChallenge(challenge);
       if (res.error || !res.shareUrl) throw new Error("Share failed");
+      // Store the challenge code for later leaderboard submission
+      const code = res.shareUrl.split("/").pop();
+      if (typeof window !== "undefined") {
+        localStorage.setItem("challengeCode", code || "");
+      }
       router.push(res.shareUrl);
       alert(`Share link: ${res.shareUrl}`);
     } catch (e) {
