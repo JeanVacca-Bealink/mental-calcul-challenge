@@ -19,11 +19,22 @@ export async function getUserInfo(): Promise<UserInfo | null> {
 
   if (!user_id) return null;
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("userinfo")
     .select("id, user_id, nickname, created_at")
     .eq("user_id", user_id)
     .single();
+
+    if(error?.code == "PGRST116"){
+        let { data: newData, error } = await supabase.from("userinfo").insert({
+            user_id: user_id,
+            nickname: "Anonymous"
+        })
+        .select("id, user_id, nickname, created_at")
+        .single();
+        if(!error)
+            return newData as UserInfo;
+    }
 
   if (error) {
     console.error("Error fetching user info:", error);

@@ -12,19 +12,22 @@ import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { generateChallengeQuestion } from "@/lib/client/challenge";
 import { useInterval } from "react-use";
 import { ChallengeEntry, QuestionEntry } from "@/app/actions/challenges.actions";
 import { addLeaderboardEntry } from "@/app/actions/leaderboard.actions";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
+import { ArrowRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Slider } from "./ui/slider";
 
 export function Challenge({ challenge, nickname, started, onStart }: { challenge?: ChallengeEntry, nickname?: string, started?: boolean, onStart?: (s: boolean) => void }) {
   const router = useRouter();
 
   // --- Mode configuration ---
   const [isStarted, setIsStarted] = useState(false);
-  const [totalQuestions, setTotalQuestions] = useState(5);
+  const [totalQuestions, setTotalQuestions] = useState([5]);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">(
     "easy"
   );
@@ -80,7 +83,7 @@ export function Challenge({ challenge, nickname, started, onStart }: { challenge
   const handleStart = () => {
     setQuestions(
       shuffle(challenge?.questions ??
-        Array.from({ length: totalQuestions }, () =>
+        Array.from({ length: totalQuestions[0] }, () =>
           generateChallengeQuestion(difficulty)
         ))
     );
@@ -128,7 +131,7 @@ export function Challenge({ challenge, nickname, started, onStart }: { challenge
             const client = createBrowserClient();
             const user = await client.auth.getUser();
             const isAnon = !user.data.user;
-            
+
             if (challenge) {
               var leaderBoardId = await addLeaderboardEntry(challenge.id, nickname ?? "Anonymous", newScore, elapsedMs);
               // If anonymous, store entry locally and still attempt to write a row server-side
@@ -214,90 +217,103 @@ export function Challenge({ challenge, nickname, started, onStart }: { challenge
     inputRef.current?.focus();
   }, [currentIndex]);
 
+  const renderCountDown = () => {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-8">
+        <p className="text-muted-foreground">Get ready!</p>
+        <p className="text-6xl font-bold text-center">{countdown}</p>
+      </div>
+    )
+  }
+
   return (
-    <Card className="max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="text-center">
-          Daily Mental Math Challenge
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {!isStarted ? (
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="total">Number of Questions</Label>
-              {challenge ? (
-                <div>{challenge.total_questions}</div>
-              ) : (
-                <Input
-                  id="total"
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={totalQuestions}
-                  onChange={(e) =>
-                    setTotalQuestions(parseInt(e.target.value, 10))
-                  }
-                />
-              )}
+      <Card className="shadow-xl border-purple-100">
+        <CardHeader>
+          <CardTitle>Create New Challenge</CardTitle>
+          <CardDescription>
+            Customize your math challenge and start competing
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {!isStarted ? (<>
+            <div className="space-y-3">
+              <Label htmlFor="difficulty">Difficulty Level</Label>
+              <Select value={difficulty} onValueChange={(e) =>
+                setDifficulty(e as "easy" | "medium" | "hard")
+              }>
+                <SelectTrigger className="w-100" id="difficulty">
+                  <SelectValue placeholder="Select difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="easy">Easy - Basic Operations</SelectItem>
+                  <SelectItem value="medium">Medium - Mixed Problems</SelectItem>
+                  <SelectItem value="hard">Hard - Complex Equations</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="difficulty">Difficulty</Label>
-              {challenge ? (
-                <div>{challenge.difficulty}</div>
-              ) : (
-                <select
-                  id="difficulty"
-                  value={difficulty}
-                  onChange={(e) =>
-                    setDifficulty(e.target.value as "easy" | "medium" | "hard")
-                  }
-                  className="border rounded px-2 py-1"
-                >
-                  <option value="easy">Easy (1‑20)</option>
-                  <option value="medium">Medium (1‑50)</option>
-                  <option value="hard">Hard (1‑100)</option>
-                </select>
-              )}
-            </div>
-            <Button onClick={handleStart} className="w-full" disabled={challenge && !nickname}>
-              Start Challenges
-            </Button>
-          </div>
-        ) : countdown !== null && countdown >= 0 ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-8">
-            <p className="text-muted-foreground">Get ready!</p>
-            <p className="text-6xl font-bold text-center">{countdown}</p>
-          </div>
-        ) : (
-          <div>
-            <p className="text-center mb-2">
-              Question {currentIndex + 1} / {questions.length}
-            </p>
-            <p className="text-center mb-4">
-              {questions[currentIndex].question}
-            </p>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-              <Label htmlFor="answer">Your Answer</Label>
-              <Input
-                id="answer"
-                type="number"
-                ref={inputRef}
-                onKeyDown={handleKeyDown}
-                tabIndex={0}
-                required
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="question-count">Number of Questions</Label>
+                <span className="text-sm text-purple-600">{totalQuestions[0]} questions</span>
+              </div>
+              <Slider
+                id="question-count"
+                min={5}
+                max={50}
+                step={5}
+                value={totalQuestions}
+                onValueChange={setTotalQuestions}
+                className="py-4"
               />
-              <Button type="submit" className="w-full mt-2" >
-                Check
-              </Button>
-            </form>
-            {feedback && (
-              <p className="mt-4 text-center font-medium">{feedback}</p>
-            )}
-            <p className="mt-4 text-center">Time left: {timeLeft}s</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>5</span>
+                <span>25</span>
+                <span>50</span>
+              </div>
+            </div>
+
+            {/* Start Button */}
+            <Button
+              onClick={handleStart}
+              className="w-full bg-purple-600 hover:bg-purple-700"
+              size="lg"
+            >
+              Start Challenge
+              <ArrowRight className="size-4 ml-2" />
+            </Button>
+          </>
+          ) : countdown !== null && countdown >= 0 ? (
+            renderCountDown()
+          ) : (
+            <div>
+              <p className="text-center mb-2">
+                Question {currentIndex + 1} / {questions.length}
+              </p>
+              <p className="text-center mb-4">
+                {questions[currentIndex].question}
+              </p>
+              <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                <Label htmlFor="answer">Your Answer</Label>
+                <Input
+                  id="answer"
+                  type="number"
+                  ref={inputRef}
+                  onKeyDown={handleKeyDown}
+                  tabIndex={0}
+                  required
+                />
+                <Button type="submit" className="w-full mt-2" >
+                  Check
+                </Button>
+              </form>
+              {feedback && (
+                <p className="mt-4 text-center font-medium">{feedback}</p>
+              )}
+              <p className="mt-4 text-center">Time left: {timeLeft}s</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
   );
 }

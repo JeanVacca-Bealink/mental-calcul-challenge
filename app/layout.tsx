@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import { AuthSync } from "@/components/auth-sync";
+import Header from "@/components/header";
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -34,8 +35,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthSync />
-          {children}
+          <main className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
+            <div className="min-h-screen flex flex-col">
+              <Header></Header>
+              <AuthSync />
+              {children}
+            </div>
+          </main>
         </ThemeProvider>
       </body>
     </html>
