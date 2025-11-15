@@ -54,12 +54,12 @@ export async function addLeaderboardEntry(
   nickname: string,
   score: number,
   timeMs: number
-): Promise<boolean> {
+): Promise<string> {
   const supabase = await createClient();
 
   const user_id = (await supabase.auth.getUser()).data.user?.id;
 
-  const { error } = await supabase
+  const { data: result, error } = await supabase
     .from("leaderboard")
     .insert({
       challenge_id: challengeId,
@@ -67,12 +67,14 @@ export async function addLeaderboardEntry(
       nickname,
       score,
       time_ms: timeMs,
-    });
+    })
+    .select("id")
+    .single();
 
   if (error) {
     console.error("Leaderboard insert error", error);
-    return false;
+    return "";
   }
 
-  return true;
+  return result?.id;
 }

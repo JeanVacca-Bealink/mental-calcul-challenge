@@ -17,6 +17,7 @@ import { generateChallengeQuestion } from "@/lib/client/challenge";
 import { useInterval } from "react-use";
 import { ChallengeEntry, QuestionEntry } from "@/app/actions/challenges.actions";
 import { addLeaderboardEntry } from "@/app/actions/leaderboard.actions";
+import { createClient as createBrowserClient } from "@/lib/supabase/client";
 
 export function Challenge({ challenge, nickname, started, onStart }: { challenge?: ChallengeEntry, nickname?: string, started?: boolean, onStart?: (s: boolean) => void }) {
   const router = useRouter();
@@ -121,14 +122,47 @@ export function Challenge({ challenge, nickname, started, onStart }: { challenge
         setIsStarted(false);
         onStart?.(false);
         const elapsedMs = startTime ? Date.now() - startTime : 0;
-        if (challenge) {
-          addLeaderboardEntry(challenge.id, nickname ?? "anonymous", newScore, elapsedMs);
-          router.push(`/leaderboard/${challenge.code}`);
-        } else {
-          persistChallenge(newScore, elapsedMs, questions.length);
-          // Record leaderboard entry with nickname
-          router.push(`/score`);
-        }
+        (async () => {
+          // Save locally for anonymous users so we can migrate after signup
+          try {
+            const client = createBrowserClient();
+            const user = await client.auth.getUser();
+            const isAnon = !user.data.user;
+            
+            if (challenge) {
+              var leaderBoardId = await addLeaderboardEntry(challenge.id, nickname ?? "Anonymous", newScore, elapsedMs);
+              // If anonymous, store entry locally and still attempt to write a row server-side
+              if (isAnon) {
+                try {
+                  const key = "localCompletedChallenges";
+                  const raw = localStorage.getItem(key);
+                  const arr = raw ? JSON.parse(raw) : [];
+                  arr.push({
+                    leaderBoardId: leaderBoardId,
+                    challengeId: challenge.id,
+                    nickname: nickname ?? "Anonymous",
+                    score: newScore,
+                    timeMs: elapsedMs,
+                    created_at: new Date().toISOString(),
+                    code: challenge.code,
+                  });
+                  localStorage.setItem(key, JSON.stringify(arr));
+                } catch (err) {
+                  console.error("error saving local completed challenge", err);
+                }
+              }
+
+              // Attempt server-side add (works for authenticated users, will insert anonymous row otherwise)
+              router.push(`/leaderboard/${challenge.code}`);
+            } else {
+              // No challenge (ad-hoc), persist locally
+              persistChallenge(newScore, elapsedMs, questions.length);
+              router.push(`/score`);
+            }
+          } catch (err) {
+            console.error("error handling end of challenge", err);
+          }
+        })();
       }
     }, 200);
     setScore(newScore);

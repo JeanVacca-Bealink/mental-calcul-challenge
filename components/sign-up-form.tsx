@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { upsertUserInfo } from "@/app/actions/userinfo.actions";
 
 export function SignUpForm({
   className,
@@ -49,6 +50,8 @@ export function SignUpForm({
         },
       });
       if (error) throw error;
+      // Save nickname to userinfo table
+      await upsertUserInfo(nickname);
       router.push("/auth/sign-up-success");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");

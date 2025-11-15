@@ -38,9 +38,25 @@ export default function ChallengePage() {
       }
       const { id, difficulty, total_questions } = resp.challenge;
       setChallenge(resp.challenge);
-      // Check if authenticated user has answered
+      // Check if authenticated user has answered (server-side)
       const answeredFlag = await hasUserAnsweredChallenge(id);
-      setAnswered(answeredFlag);
+      // If server says not answered, check localStorage for anonymous entries
+      if (!answeredFlag) {
+        try {
+          if (typeof window !== "undefined") {
+            const raw = localStorage.getItem("localCompletedChallenges");
+            if (raw) {
+              const arr = JSON.parse(raw) as Array<any>;
+              const found = arr.find((x) => x.challengeId === id);
+              if (found) setAnswered(true);
+            }
+          }
+        } catch (err) {
+          console.error("error reading local completed challenges", err);
+        }
+      } else {
+        setAnswered(true);
+      }
       setLoading(false);
     };
     fetchData();

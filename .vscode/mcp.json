@@ -1,5 +1,5 @@
 {
-  "servers": {
+	"servers": {
 		"serena-local": {
 			"type": "stdio",
 			"command": "uvx",
@@ -8,9 +8,11 @@
 				"git+https://github.com/oraios/serena",
 				"serena",
 				"start-mcp-server",
-        "--project",
-        "E:\\NVME_PROJECTS\\Bolt\\daily-challenge"
+				"--project",
+				"E:\\NVME_PROJECTS\\Bolt\\daily-challenge",
+				"--context",
+				"ide-assistant"
 			]
 		}
-  }
+	}
 }
