@@ -1,11 +1,16 @@
 {
   "servers": {
-    "shadcn": {
-      "command": "npx",
-      "args": [
-        "shadcn@latest",
-        "mcp"
-      ]
-    }
+		"serena-local": {
+			"type": "stdio",
+			"command": "uvx",
+			"args": [
+				"--from",
+				"git+https://github.com/oraios/serena",
+				"serena",
+				"start-mcp-server",
+        "--project",
+        "E:\\NVME_PROJECTS\\Bolt\\daily-challenge"
+			]
+		}
   }
 }
