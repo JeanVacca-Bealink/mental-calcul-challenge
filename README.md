@@ -1,10 +1,10 @@
 <a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
+  <img alt="Mathematical Challenge App - Create and share simple calculation challenges" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
+  <h1 align="center">Mathematical Challenge App</h1>
 </a>
 
 <p align="center">
- The fastest way to build apps with Next.js and Supabase
+  A web app for creating and sharing simple calculation challenges
 </p>
 
 <p align="center">

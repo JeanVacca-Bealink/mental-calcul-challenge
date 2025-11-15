@@ -7,7 +7,7 @@
 */
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, EventHandler, ReactEventHandler } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -15,24 +15,26 @@ import { Label } from "./ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { generateChallengeQuestion } from "@/lib/client/challenge";
 import { useInterval } from "react-use";
-import { ChallengeEntry } from "@/app/actions/challenges.actions";
+import { ChallengeEntry, QuestionEntry } from "@/app/actions/challenges.actions";
+import { addLeaderboardEntry } from "@/app/actions/leaderboard.actions";
 
-export function Challenge({
-  challengeId,
-  challenge
-}: {
-  challengeId: string;
-  challenge: ChallengeEntry
-}) {
+export function Challenge({ challenge, nickname, started }: { challenge?: ChallengeEntry, nickname?: string, started?: boolean }) {
   const router = useRouter();
 
   // --- Mode configuration ---
   const [isStarted, setIsStarted] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState(5);
-  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("easy");
+  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">(
+    "easy"
+  );
 
-  // --- Challenge state ---
-  const [questions, setQuestions] = useState<Array<{ question: string; answer: number }>>([]);
+  // --- Countdown state (before questions begin) ---
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  // --- Challenge state ---  
+  const [questions, setQuestions] = useState<
+    Array<{ question: string; answer: number }>
+  >([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -53,24 +55,44 @@ export function Challenge({
     elapsed_time: number,
     total: number
   ) => {
-    const data = { difficulty, score: finalScore, elapsed_time, total, questions };
+    const data = {
+      difficulty,
+      score: finalScore,
+      elapsed_time,
+      total,
+      questions,
+    };
     if (typeof window !== "undefined") {
       localStorage.setItem("lastChallenge", JSON.stringify(data));
     } else {
       console.log("unable to store");
     }
   };
-
+  function shuffle(array: QuestionEntry[] | []) {
+    for (let i = array.length - 1; i > 0; i--) {
+      let j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  }
   // --- Start the challenge ---
   const handleStart = () => {
-    setQuestions(challenge?.questions ?? Array.from({ length: totalQuestions }, () =>  generateChallengeQuestion(difficulty)))
+    setQuestions(
+      shuffle(challenge?.questions ??
+        Array.from({ length: totalQuestions }, () =>
+          generateChallengeQuestion(difficulty)
+        ))
+    );
     setCurrentIndex(0);
     setScore(0);
     setFeedback(null);
     setIsStarted(true);
+    setCountdown(5);
     setStartTime(Date.now());
-    const baseTime = difficulty === "easy" ? 60 : difficulty === "medium" ? 45 : 30;
+    const baseTime =
+      difficulty === "easy" ? 60 : difficulty === "medium" ? 45 : 30;
     setTimeLeft(baseTime);
+    started = true;
   };
 
   // --- Handle answer submission ---
@@ -79,7 +101,7 @@ export function Challenge({
     if (!inputRef.current?.value) return;
 
     const current = questions[currentIndex];
-    const userAns = parseInt((inputRef.current?.value ?? ""), 10);
+    const userAns = parseInt(inputRef.current?.value ?? "", 10);
     const isCorrect = userAns === current.answer;
     const newScore = isCorrect ? score + 1 : score;
     if (isCorrect) {
@@ -98,10 +120,14 @@ export function Challenge({
         // End of challenge
         setIsStarted(false);
         const elapsedMs = startTime ? Date.now() - startTime : 0;
-        persistChallenge(newScore, elapsedMs, questions.length);
-        // Record leaderboard entry with nickname
-        //addLeaderboardEntry(challengeId, nickname, newScore, elapsedMs);
-        router.push(`/score`);
+        if (challenge) {
+          addLeaderboardEntry(challenge.id, nickname ?? "anonymous", newScore, elapsedMs);
+          router.push(`/leaderboard/${challenge.code}`);
+        } else {
+          persistChallenge(newScore, elapsedMs, questions.length);
+          // Record leaderboard entry with nickname
+          router.push(`/score`);
+        }
       }
     }, 200);
     setScore(newScore);
@@ -114,7 +140,23 @@ export function Challenge({
     }
   };
 
-  // --- Timer logic using react-use's useInterval ---
+  // --- Countdown timer (before challenge begins) ---
+  useInterval(
+    () => {
+      if (countdown !== null && countdown > 0) {
+        setCountdown((c) => (c ?? 0) - 1);
+        return;
+      }
+      if (countdown === 0) {
+        setCountdown(null);
+        setTimeout(() => inputRef.current?.focus(), 50);
+        return;
+      }
+    },
+    isStarted && countdown !== null ? 1000 : null
+  );
+
+  // --- Main timer logic (during challenge) ---
   useInterval(
     () => {
       setTimeLeft((t) => {
@@ -128,7 +170,7 @@ export function Challenge({
         return t - 1;
       });
     },
-    isStarted ? 1000 : null
+    isStarted && countdown === null ? 1000 : null
   );
 
   // --- Focus input when question changes ---
@@ -139,45 +181,66 @@ export function Challenge({
   return (
     <Card className="max-w-md mx-auto">
       <CardHeader>
-        <CardTitle className="text-center">Daily Mental Math Challenge</CardTitle>
+        <CardTitle className="text-center">
+          Daily Mental Math Challenge
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {!isStarted ? (
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="total">Number of Questions</Label>
-              <Input
-                id="total"
-                type="number"
-                min={1}
-                max={20}
-                value={totalQuestions}
-                onChange={(e) => setTotalQuestions(parseInt(e.target.value, 10))}
-              />
+              {challenge ? (
+                <div>{challenge.total_questions}</div>
+              ) : (
+                <Input
+                  id="total"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={totalQuestions}
+                  onChange={(e) =>
+                    setTotalQuestions(parseInt(e.target.value, 10))
+                  }
+                />
+              )}
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="difficulty">Difficulty</Label>
-              <select
-                id="difficulty"
-                value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value as "easy" | "medium" | "hard")}
-                className="border rounded px-2 py-1"
-              >
-                <option value="easy">Easy (1‑20)</option>
-                <option value="medium">Medium (1‑50)</option>
-                <option value="hard">Hard (1‑100)</option>
-              </select>
+              {challenge ? (
+                <div>{challenge.difficulty}</div>
+              ) : (
+                <select
+                  id="difficulty"
+                  value={difficulty}
+                  onChange={(e) =>
+                    setDifficulty(e.target.value as "easy" | "medium" | "hard")
+                  }
+                  className="border rounded px-2 py-1"
+                >
+                  <option value="easy">Easy (1‑20)</option>
+                  <option value="medium">Medium (1‑50)</option>
+                  <option value="hard">Hard (1‑100)</option>
+                </select>
+              )}
             </div>
-            <Button onClick={handleStart} className="w-full">
+            <Button onClick={handleStart} className="w-full" disabled={challenge && !nickname}>
               Start Challenges
             </Button>
+          </div>
+        ) : countdown !== null && countdown >= 0 ? (
+          <div className="flex flex-col items-center justify-center gap-4 py-8">
+            <p className="text-muted-foreground">Get ready!</p>
+            <p className="text-6xl font-bold text-center">{countdown}</p>
           </div>
         ) : (
           <div>
             <p className="text-center mb-2">
               Question {currentIndex + 1} / {questions.length}
             </p>
-            <p className="text-center mb-4">{questions[currentIndex].question}</p>
+            <p className="text-center mb-4">
+              {questions[currentIndex].question}
+            </p>
             <form onSubmit={handleSubmit} className="flex flex-col gap-2">
               <Label htmlFor="answer">Your Answer</Label>
               <Input
@@ -185,18 +248,17 @@ export function Challenge({
                 type="number"
                 ref={inputRef}
                 onKeyDown={handleKeyDown}
+                tabIndex={0}
                 required
               />
-              <Button type="submit" className="w-full mt-2">
+              <Button type="submit" className="w-full mt-2" >
                 Check
               </Button>
             </form>
             {feedback && (
               <p className="mt-4 text-center font-medium">{feedback}</p>
             )}
-            <p className="mt-4 text-center">
-              Time left: {timeLeft}s
-            </p>
+            <p className="mt-4 text-center">Time left: {timeLeft}s</p>
           </div>
         )}
       </CardContent>

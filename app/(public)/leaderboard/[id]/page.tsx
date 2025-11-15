@@ -15,15 +15,16 @@ export default async function LeaderboardPage({
   const origin = new URL(headersKeys.get("referer") || `http://${headersKeys.get("host")}`).origin;
   console.log(code);
 
-  const challenge = await getChallengeByCode(code as string);
-  if (!challenge) return <div>Challenge Not Found</div>;
+  const result = await getChallengeByCode(code as string);
+  if (result?.error) return <div>Challenge Not Found</div>;
 
+  const challenge = result?.challenge;
   // Fetch leaderboard entries
-  const entries = await getLeaderboard(challenge?.id);
+  const entries = await getLeaderboard(challenge?.id ?? "");
 
   return (
     <div className="p-4 max-w-3xl mx-auto">
-      {challenge.is_author && (
+      {challenge?.is_author && (
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">
             Share this challenge
@@ -44,6 +45,7 @@ export default async function LeaderboardPage({
           <thead>
             <tr>
               <th className="border-b py-2 text-left">Nickname</th>
+              <th className="border-b py-2 text-left">Timer</th>
               <th className="border-b py-2 text-left">Score</th>
               <th className="border-b py-2 text-left">Date</th>
             </tr>
@@ -52,9 +54,10 @@ export default async function LeaderboardPage({
             {entries.map((e, idx) => (
               <tr key={idx}>
                 <td className="border-b py-2">{e.nickname}</td>
-                <td className="border-b py-2">{e.score}</td>
+                <td className="border-b py-2">{(e.time_ms ?? 0 )/1000}</td>
+                <td className="border-b py-2">{e.score / (challenge?.total_questions || 1)}</td>
                 <td className="border-b py-2">
-                  {new Date(e.created_at).toLocaleDateString()}
+                  {new Date(e.created_at).toLocaleDateString()} {new Date(e.created_at).toLocaleTimeString()}
                 </td>
               </tr>
             ))}

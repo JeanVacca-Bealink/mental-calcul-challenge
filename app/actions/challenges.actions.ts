@@ -4,8 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { addLeaderboardEntry } from "./leaderboard.actions";
 
 interface QuestionModel {
-  a: number;
-  q: string;
+  answer: number;
+  question: string;
 }
 
 export async function addChallenge(challenge: {
@@ -36,11 +36,11 @@ export async function addChallenge(challenge: {
   var challenge_id = data.id;
   console.log("challenge added : " + challenge_id);
   challenge.questions.forEach(async (question) => {
-    console.log("adding question : " + question.q);
+    console.log("adding question : " + question.question);
     await supabase.from("questions").insert({
       challenge_id,
-      question: question.q,
-      answer: question.a,
+      question: question.question,
+      answer: question.answer,
     });
   });
 
@@ -65,7 +65,10 @@ export async function getChallengeByCode(
     .select("id, user_id, code, difficulty, total_questions")
     .eq("code", challengeCode)
     .single();
-  if (challengeErr) return { error: challengeErr.message };
+  if (challengeErr) {
+    console.error("Challenge fetch: challenge not found", challengeErr);
+    return { error: challengeErr.message };
+  }
   
   const result =  {
       id: challenge?.id || "",
@@ -79,9 +82,11 @@ export async function getChallengeByCode(
       const { data: questions, error: challengeErr } = await supabase
         .from("questions")
         .select("question, answer")
-        .eq("id", challenge?.id);
+        .eq("challenge_id", challenge?.id);
 
       result.questions = questions;
+      console.log("load question " + challengeErr );
+      console.table(questions);
   }
   
   return {

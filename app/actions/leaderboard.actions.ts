@@ -37,7 +37,8 @@ export default async function getLeaderboard(
     .from("leaderboard")
     .select("nickname, score, created_at, time_ms")
     .eq("challenge_id", challenge.id)
-    .order("score", { ascending: false });
+    .order("score", { ascending: false })
+    .order("time_ms", { ascending: true })
 
   if (entriesErr) {
     console.error("Leaderboard fetch: entries error", entriesErr);

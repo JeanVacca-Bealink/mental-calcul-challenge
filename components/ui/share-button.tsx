@@ -36,7 +36,6 @@ export default function ShareButton() {
         localStorage.setItem("challengeCode", code || "");
       }
       router.push(res.shareUrl);
-      alert(`Share link: ${res.shareUrl}`);
     } catch (e) {
       console.error(e);
       alert("Error sharing challenge");

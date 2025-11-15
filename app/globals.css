@@ -66,3 +66,15 @@
     @apply bg-background text-foreground;
   }
 }
+
+.challenge-card.easy{
+    @apply bg-green-200;
+}
+
+.challenge-card.medium{
+    @apply bg-green-300;
+}
+
+.challenge-card.hard{
+    @apply bg-green-400;
+}
