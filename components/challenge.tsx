@@ -18,7 +18,7 @@ import { useInterval } from "react-use";
 import { ChallengeEntry, QuestionEntry } from "@/app/actions/challenges.actions";
 import { addLeaderboardEntry } from "@/app/actions/leaderboard.actions";
 
-export function Challenge({ challenge, nickname, started }: { challenge?: ChallengeEntry, nickname?: string, started?: boolean }) {
+export function Challenge({ challenge, nickname, started, onStart }: { challenge?: ChallengeEntry, nickname?: string, started?: boolean, onStart?: (s: boolean) => void }) {
   const router = useRouter();
 
   // --- Mode configuration ---
@@ -92,7 +92,7 @@ export function Challenge({ challenge, nickname, started }: { challenge?: Challe
     const baseTime =
       difficulty === "easy" ? 60 : difficulty === "medium" ? 45 : 30;
     setTimeLeft(baseTime);
-    started = true;
+    onStart?.(true);
   };
 
   // --- Handle answer submission ---
@@ -119,6 +119,7 @@ export function Challenge({ challenge, nickname, started }: { challenge?: Challe
       } else {
         // End of challenge
         setIsStarted(false);
+        onStart?.(false);
         const elapsedMs = startTime ? Date.now() - startTime : 0;
         if (challenge) {
           addLeaderboardEntry(challenge.id, nickname ?? "anonymous", newScore, elapsedMs);
@@ -163,6 +164,7 @@ export function Challenge({ challenge, nickname, started }: { challenge?: Challe
         if (t <= 1) {
           // Time's up, end challenge
           setIsStarted(false);
+          onStart?.(false);
           persistChallenge(score, 0, questions.length);
           router.push(`/score`);
           return 0;

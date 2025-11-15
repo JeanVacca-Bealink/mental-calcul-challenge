@@ -16,7 +16,7 @@ export default function ChallengePage() {
   const [answered, setAnswered] = useState(false);
   const [nickname, setNickname] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  let started = false;
+  const [started, setStarted] = useState<boolean>(false);
   // Load nickname from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -76,9 +76,15 @@ export default function ChallengePage() {
           id="nickname"
           value={nickname}
           onChange={(e) => setNickname(e.target?.value)}
+          disabled={started}
         ></Input>
       </div>
-      <Challenge challenge={challenge} nickname={nickname} started={started} />
+      <Challenge
+        challenge={challenge}
+        nickname={nickname}
+        started={started}
+        onStart={(s) => setStarted(s)}
+      />
     </div>
   );
 }
