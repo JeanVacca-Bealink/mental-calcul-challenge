@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { BarChart3, Calendar, Clock, ExternalLink, InfoIcon, LinkIcon, Share2, Target, TrendingUp } from "lucide-react";
+import { getAllUserChallengesStats } from "@/app/actions/stats.actions";
 import {
   Card,
   CardHeader,
@@ -34,6 +35,10 @@ export default async function ProtectedPage() {
     .select("*")
     .order("created_at", { ascending: false })
     .eq("user_id", claims.claims.sub);
+
+  // Get stats for all user challenges
+  const challengeIds = challenges?.map((c: any) => c.id) || [];
+  const challengesStats = await getAllUserChallengesStats(challengeIds);
 
   // Fetch leaderboard entries for the user
   const myUserId = claims.claims.sub;
@@ -118,6 +123,28 @@ export default async function ProtectedPage() {
   const avgTimePerQuestionMs =
     totalQuestionsAnswered > 0 ? totalTimeMs / totalQuestionsAnswered : 0;
 
+  // Calculate Best Score (highest percentage in a single challenge)
+  const bestScore =
+    myLeaderboard && myLeaderboard.length > 0
+      ? Math.max(
+        ...myLeaderboard.map((r: any) => {
+          const total = challengeMap[r.challenge_id]?.total_questions || 0;
+          return total > 0 ? (r.score / total) * 100 : 0;
+        })
+      )
+      : 0;
+
+  // Calculate percentage of correct answers overall
+  const totalCorrectAnswers = (myLeaderboard || []).reduce(
+    (sum: number, r: any) => sum + (r.score || 0),
+    0
+  );
+
+  const correctAnswersPercentage =
+    totalQuestionsAnswered > 0
+      ? ((totalCorrectAnswers / totalQuestionsAnswered) * 100).toFixed(2)
+      : 0;
+
   const formatMs = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
@@ -127,10 +154,6 @@ export default async function ProtectedPage() {
 
   const percentage = (score: number, total: number) => {
     return total <= 0 ? 0 : ((score / total) * 100).toFixed(2)
-  }
-
-  const myScore = (challengId: number) => {
-    return myLeaderboard?.find(x => x.challenge_id == challengId) || { score: 0, time_ms: 0 };
   }
 
   const getDifficultyColor = (difficulty: string) => {
@@ -175,28 +198,19 @@ export default async function ProtectedPage() {
                   <Target className="size-8 text-purple-600" />
                   <TrendingUp className="size-4 text-green-600" />
                 </div>
-                <div className="text-3xl text-purple-600 mb-1">{avgPercent}</div>
-                <div className="text-sm text-gray-600">Average Score</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between mb-2">
-                  <Target className="size-8 text-blue-600" />
-                </div>
-                <div className="text-3xl text-blue-600 mb-1">{avgPercent}%</div>
+                <div className="text-3xl text-purple-600 mb-1">{avgPercent.toFixed(2)}%</div>
                 <div className="text-sm text-gray-600">Average Accuracy</div>
                 <Progress value={avgPercent} className="mt-2 h-2" />
               </CardContent>
             </Card>
+
 
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between mb-2">
                   <Clock className="size-8 text-orange-600" />
                 </div>
-                <div className="text-3xl text-orange-600 mb-1">{avgTimePerQuestionMs}</div>
+                <div className="text-3xl text-orange-600 mb-1">{formatMs(avgTimePerQuestionMs)}</div>
                 <div className="text-sm text-gray-600">Average Time</div>
               </CardContent>
             </Card>
@@ -210,6 +224,17 @@ export default async function ProtectedPage() {
                 <div className="text-sm text-gray-600">Total Challenges</div>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Clock className="size-8 text-blue-600" />
+                </div>
+                <div className="text-3xl text-blue-600 mb-1">{formatMs(totalTimeMs)}</div>
+                <div className="text-sm text-gray-600">Total Time</div>
+              </CardContent>
+            </Card>
+
           </div>
 
           {/* Overall Performance */}
@@ -223,23 +248,22 @@ export default async function ProtectedPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Best Score</span>
-                    <span className="text-purple-600">{numChallengesDone}</span>
+                    <span className="text-purple-600">{bestScore.toFixed(2)}%</span>
                   </div>
-                  <Progress value={85} className="h-2" />
+                  <Progress value={bestScore} className="h-2" />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Total Questions</span>
-                    <span className="text-blue-600">{numChallengesDone}</span>
+                    <span className="text-blue-600">{totalQuestionsAnswered}</span>
                   </div>
-                  <Progress value={70} className="h-2" />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Correct Answers</span>
-                    <span className="text-green-600">{numChallengesDone}</span>
+                    <span className="text-green-600">{correctAnswersPercentage}%</span>
                   </div>
-                  <Progress value={92} className="h-2" />
+                  <Progress value={Number(correctAnswersPercentage)} className="h-2" />
                 </div>
               </div>
             </CardContent>
@@ -262,55 +286,49 @@ export default async function ProtectedPage() {
 
                 {/* My Created Challenges Tab */}
                 <TabsContent value="created" className="space-y-3 mt-6">
-                  {challenges?.map((challenge) => (
-                    <div
-                      key={challenge.id}
-                      className="flex items-center gap-4 p-4 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge className={getDifficultyColor(challenge.difficulty)}>
-                            {challenge.difficulty}
-                          </Badge>
+                  {challenges?.map((challenge) => {
+                    const stats = challengesStats[challenge.id] || { completions: 0, averageScore: "0" };
+                    return (
+                      <div
+                        key={challenge.id}
+                        className="flex items-center gap-4 p-4 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge className={getDifficultyColor(challenge.difficulty)}>
+                              {challenge.difficulty}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <span>{challenge.total_questions} questions</span>
+                            <span>•</span>
+                            <span>{stats.completions} completions</span>
+                            <span>•</span>
+                            <span>Created {new Date(challenge.created_at).toLocaleString()}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                          <span>{challenge.total_questions} questions</span>
-                          <span>•</span>
-                          <span>{challenge.completions} completions</span>
-                          <span>•</span>
-                          <span>Created {new Date(challenge.created_at).toLocaleString()}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-6">
-                        <div className="text-right">
-                          <div className="text-purple-600">{challenge.averageScore}</div>
-                          <div className="text-xs text-gray-500">Avg Score</div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {/* <Button
-                            variant="ghost"
-                            size="sm"
-                            className="flex items-center gap-1"
-                            onClick={() => )}
-                          >
-                            <Share2 className="size-4" />
-                            Share
-                          </Button> */}
-                          <Button
-                            asChild
-                            variant="ghost"
-                            size="sm"
-                            className="flex items-center gap-1"
-                          >
-                            <Link href={`/leaderboard/` + challenge.code}>
-                              <ExternalLink className="size-4" />
-                              View
-                            </Link>
-                          </Button>
+                        <div className="flex items-center gap-6">
+                          <div className="text-right">
+                            <div className="text-purple-600">{stats.averageScore}%</div>
+                            <div className="text-xs text-gray-500">Avg Score</div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="sm"
+                              className="flex items-center gap-1"
+                            >
+                              <Link href={`/leaderboard/` + challenge.code}>
+                                <ExternalLink className="size-4" />
+                                View
+                              </Link>
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </TabsContent>
 
                 {/* Other Challenges Results Tab */}
@@ -320,37 +338,44 @@ export default async function ProtectedPage() {
                       key={result.id}
                       className="flex items-center gap-4 p-4 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
                     >
-                      {/* <div className="flex-1">
+                      <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="text-gray-900">{result.challengeName}</span>
                           <Badge className={getDifficultyColor(result.difficulty)}>
                             {result.difficulty}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-4 text-sm text-gray-600">
-                          <span>by {result.creator}</span>
+                          <span>{result.total_questions} questions</span>
                           <span>•</span>
-                          <span>Completed {result.completedAt}</span>
+                          <span>{result.entries.length} participants</span>
                           <span>•</span>
-                          <span>
-                            Rank #{result.rank} of {result.totalParticipants}
-                          </span>
+                          <span>Created {new Date(result.created_at).toLocaleString()}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 text-sm">
-                        <div className="text-right">
-                          <div className="text-purple-600">{result.score}</div>
-                          <div className="text-xs text-gray-500">Score</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-gray-900">{result.accuracy}%</div>
-                          <div className="text-xs text-gray-500">Accuracy</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-gray-900">{result.time}</div>
-                          <div className="text-xs text-gray-500">Time</div>
-                        </div>
-                      </div> */}
+                      <div className="flex items-center gap-6">
+                        {result.myEntry ? (
+                          <>
+                            <div className="text-right">
+                              <div className="text-purple-600">
+                                {result.myEntry.score}/{result.total_questions}
+                              </div>
+                              <div className="text-xs text-gray-500">Your Score</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-blue-600">#{result.myRank}</div>
+                              <div className="text-xs text-gray-500">Rank</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-orange-600">
+                                {result.myEntry.time_ms ? formatMs(result.myEntry.time_ms) : "—"}
+                              </div>
+                              <div className="text-xs text-gray-500">Time</div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-sm text-gray-500">Not completed</div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </TabsContent>
@@ -360,131 +385,6 @@ export default async function ProtectedPage() {
         </div>
       </main>
 
-      <div className="flex-1 min-w-[500px] flex flex-col gap-12">
-        {/* User stats card */}
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle>
-              <div className="flex justify-between">
-                <span>Your stats</span>
-                <span className="text-xs font-normal">Challenges done : {numChallengesDone}</span>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="flex flex-col">
-                <span className="text-sm text-muted-foreground">Average percentage</span>
-                <div className="bg-cyan-300 w-full min-w-[200px] p-6 rounded-md">
-                  <div className="flex flex-col justify-stretch content-stretch items-center">
-                    <span className="font-semibold text-2xl">{avgPercent.toFixed(2)}%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col">
-                <span className="text-sm text-muted-foreground">Total time spent</span>
-                <div className="bg-green-300 w-full min-w-[200px] p-6 rounded-md">
-                  <div className="flex flex-col justify-stretch content-stretch items-center">
-                    <span className="font-semibold text-2xl">{formatMs(totalTimeMs)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col">
-                <span className="text-sm text-muted-foreground">Avg time / question</span>
-                <div className="bg-purple-300 w-full min-w-[200px] p-6 rounded-md">
-                  <div className="flex flex-col justify-stretch content-stretch items-center">
-                    <span className="font-semibold text-2xl">{(avgTimePerQuestionMs / 1000).toFixed(2)}s</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <div className="flex flex-col gap-4">
-          <Tabs defaultValue="challenges">
-            <TabsList>
-              <TabsTrigger value="challenges">Your challenges</TabsTrigger>
-              <TabsTrigger value="leaderboards">Leaderboards</TabsTrigger>
-            </TabsList>
-            <TabsContent value="challenges">
-              <div className="flex flex-col gap-4 ">
-                {challenges && challenges.length > 0 ? (
-                  challenges.map((c) => (
-                    <div
-                      key={c.id}
-                      className={`border rounded p-4 shadow-sm flex flex-col gap-2 challenge-card ${c.difficulty}`}
-                    >
-                      <div className="font-semibold text-right">
-                        {new Date(c.created_at).toLocaleString()}
-                      </div>
-                      <div>Score: {percentage(c.score, c.total_questions)}% ({c.score}/{c.total_questions}) on {formatMs(myScore(c.id).time_ms)}</div>
-                      <Link href={`/leaderboard/${c.code}`} target="_blank" >
-                        <span className="flex gap-2">
-                          <LinkIcon></LinkIcon>
-                          Leaderboard
-                        </span>
-                      </Link>
-                    </div>
-                  ))
-                ) : (
-                  <p>No challenges found.</p>
-                )}
-              </div>
-            </TabsContent>
-            <TabsContent value="leaderboards">
-              <div className="flex flex-col gap-4">
-                {externalBlocks && externalBlocks.length > 0 ? (
-                  externalBlocks.map((b) => (
-                    <div key={b.id} className={`border rounded p-4 shadow-sm flex flex-col gap-2 challenge-card ${b.difficulty}`}>
-                      <div className="font-semibold">Challenge: {b.created_at}</div>
-                      <div>Difficulty: {b.difficulty}</div>
-                      <div>Total Questions: {b.total_questions}</div>
-                      {b.myEntry ? (
-                        <div className="mt-2">
-                          <div>My Rank: <strong>{b.myRank}</strong></div>
-                          <div>My Score: <strong>{b.myEntry.score}</strong></div>
-                          <div>My Time: <strong>{b.myEntry.time_ms ?? '—'}</strong> ms</div>
-                          <div>
-
-
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="mt-2">You don't have an entry for this leaderboard.</div>
-                      )}
-
-                      {/* show top 3 as preview */}
-                      {b.entries && b.entries.length > 0 && (
-                        <div className="mt-3">
-                          <div className="text-sm font-medium">Top players:</div>
-                          <ol className="list-decimal list-inside">
-                            {b.entries.slice(0, 3).map((e: any, i: number) => (
-                              <li key={i} className="text-sm">
-                                {e.nickname} — {e.score} pts — {e.time_ms ?? '—'} ms
-                              </li>
-                            ))}
-                          </ol>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <p>No leaderboards found.</p>
-                )}
-              </div>
-            </TabsContent>
-
-          </Tabs>
-        </div>
-
-        {/* List of user challenges */}
-
-
-        {/* External leaderboards (challenges not created by me) */}
-
-      </div>
 
     </>
   );
