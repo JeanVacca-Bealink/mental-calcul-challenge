@@ -101,7 +101,7 @@ export default async function LeaderboardPage({
                         <div className="text-xs text-gray-500">Accuracy</div>
                       </div>
                       <div className="text-right w-[75px]">
-                        <div className="text-gray-900">{(entry.time_ms/1000).toFixed(3)}s</div>
+                        <div className="text-gray-900">{((entry?.time_ms ?? 0)/1000).toFixed(3)}s</div>
                         <div className="text-xs text-gray-500">Time</div>
                       </div>
                     </div>
