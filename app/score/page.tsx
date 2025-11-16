@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import ScoreContent from "@/components/ui/score-content";
 import ShareButton from "@/components/ui/share-button";
 

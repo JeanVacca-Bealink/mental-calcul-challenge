@@ -7,6 +7,8 @@ export interface LeaderboardEntry {
   score: number;
   created_at: string;
   time_ms: number | null;
+  rank: number;
+  total_questions: number;
 }
 
 export default async function getLeaderboard(
@@ -34,8 +36,8 @@ export default async function getLeaderboard(
     data: entries,
     error: entriesErr,
   } = await supabase
-    .from("leaderboard")
-    .select("nickname, score, created_at, time_ms")
+    .from("ranking")
+    .select("rank, nickname, score, created_at, time_ms, total_questions")
     .eq("challenge_id", challenge.id)
     .order("score", { ascending: false })
     .order("time_ms", { ascending: true })
@@ -44,6 +46,7 @@ export default async function getLeaderboard(
     console.error("Leaderboard fetch: entries error", entriesErr);
     return null;
   }
+  console.dir(entries);
 
   return entries as LeaderboardEntry[];
 }
