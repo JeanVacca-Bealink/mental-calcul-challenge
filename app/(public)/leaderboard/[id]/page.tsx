@@ -112,7 +112,7 @@ export default async function LeaderboardPage({
           </Card>
         </div>
       </main>
-
+{/* 
       <div className="p-4 max-w-3xl mx-auto">
         {challenge?.is_author && (
           <div className="mb-4">
@@ -156,7 +156,7 @@ export default async function LeaderboardPage({
         ) : (
           <p>No entries yet.</p>
         )}
-      </div>
+      </div> */}
     </>
 
   );

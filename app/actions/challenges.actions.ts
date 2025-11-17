@@ -19,7 +19,6 @@ export async function addChallenge(challenge: {
   const user_id = (await supabase.auth.getUser()).data.user?.id;
   // Generate a unique code for sharing
   const code = crypto.randomUUID();
-
   const { data, error } = await supabase
     .from("challenges")
     .insert({
@@ -44,9 +43,16 @@ export async function addChallenge(challenge: {
     });
   });
 
+  let userInfo = { nickname: "Anonymous"};
+  if(user_id){
+     const { data: userInfoDb } = await supabase.from("userinfo").select("user_id, nickname").eq("user_id", user_id).single()
+     if(userInfoDb)
+      userInfo = userInfoDb;
+  }
+
   addLeaderboardEntry(
     challenge_id,
-    "Anonymous",
+    userInfo?.nickname ?? "Anonymous",
     challenge.score,
     challenge.elapsed_time
   );

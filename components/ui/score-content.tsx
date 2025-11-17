@@ -16,17 +16,7 @@ export default function ScoreContent() {
   }
 
   return (
-    <div className="flex-1 w-full flex flex-col gap-12">
-      <div className="w-full">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center">Challenge Score</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-4xl font-bold">{score} / {total}</p>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    <p className="text-4xl font-bold">{score} / {total}</p>
+    
   );
 }

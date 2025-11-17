@@ -21,12 +21,15 @@ import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import { ArrowRight } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Slider } from "./ui/slider";
+import ScoreContent from "./ui/score-content";
+import ShareButton from "./ui/share-button";
 
 export function Challenge({ challenge, nickname, started, onStart }: { challenge?: ChallengeEntry, nickname?: string, started?: boolean, onStart?: (s: boolean) => void }) {
   const router = useRouter();
 
   // --- Mode configuration ---
   const [isStarted, setIsStarted] = useState(false);
+  const [showScore, setShowScore] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState([5]);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">(
     "easy"
@@ -154,14 +157,10 @@ export function Challenge({ challenge, nickname, started, onStart }: { challenge
                   console.error("error saving local completed challenge", err);
                 }
               }
-
-              // Attempt server-side add (works for authenticated users, will insert anonymous row otherwise)
-              router.push(`/leaderboard/${challenge.code}`);
             } else {
-              // No challenge (ad-hoc), persist locally
               persistChallenge(newScore, elapsedMs, questions.length);
-              router.push(`/score`);
             }
+            setShowScore(true);
           } catch (err) {
             console.error("error handling end of challenge", err);
           }
@@ -227,21 +226,27 @@ export function Challenge({ challenge, nickname, started, onStart }: { challenge
   }
 
   return (
-      <Card className="shadow-xl border-purple-100">
-        <CardHeader>
-          <CardTitle>Create New Challenge</CardTitle>
+    <Card className="shadow-xl border-purple-100 min-w-[300px]">
+      <CardHeader>
+        <CardTitle>{challenge ? "Start Challenge" : "Create New Challenge"}</CardTitle>
+        {!challenge &&
           <CardDescription>
             Customize your math challenge and start competing
           </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {!isStarted ? (<>
-            <div className="space-y-3">
-              <Label htmlFor="difficulty">Difficulty Level</Label>
+        }
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {!isStarted && !showScore ? (<>
+          <div className="space-y-3">
+            <Label htmlFor="difficulty">Difficulty Level</Label>
+            {challenge ? (
+              <span className="text-sm text-purple-600 ms-4">{challenge.difficulty}</span>
+            ) : (
+
               <Select value={difficulty} onValueChange={(e) =>
                 setDifficulty(e as "easy" | "medium" | "hard")
               }>
-                <SelectTrigger className="w-100" id="difficulty">
+                <SelectTrigger className="w-full" id="difficulty">
                   <SelectValue placeholder="Select difficulty" />
                 </SelectTrigger>
                 <SelectContent>
@@ -250,14 +255,20 @@ export function Challenge({ challenge, nickname, started, onStart }: { challenge
                   <SelectItem value="hard">Hard - Complex Equations</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            )}
+          </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="question-count">Number of Questions</Label>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="question-count">Number of Questions</Label>
+              {challenge ? (
+                <span className="text-sm text-purple-600">{challenge.total_questions} questions</span>
+              ) : (
                 <span className="text-sm text-purple-600">{totalQuestions[0]} questions</span>
-              </div>
-              <Slider
+              )}
+            </div>
+            {!challenge &&
+              <><Slider
                 id="question-count"
                 min={5}
                 max={50}
@@ -266,31 +277,41 @@ export function Challenge({ challenge, nickname, started, onStart }: { challenge
                 onValueChange={setTotalQuestions}
                 className="py-4"
               />
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>5</span>
-                <span>25</span>
-                <span>50</span>
-              </div>
-            </div>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>5</span>
+                  <span>25</span>
+                  <span>50</span>
+                </div>
+              </>}
+          </div>
 
-            {/* Start Button */}
-            <Button
-              onClick={handleStart}
-              className="w-full bg-purple-600 hover:bg-purple-700"
-              size="lg"
-            >
-              Start Challenge
-              <ArrowRight className="size-4 ml-2" />
-            </Button>
-          </>
-          ) : countdown !== null && countdown >= 0 ? (
-            renderCountDown()
-          ) : (
+          {/* Start Button */}
+          <Button
+            onClick={handleStart}
+            className="w-full bg-purple-600 hover:bg-purple-700"
+            size="lg"
+            disabled={challenge && !nickname}
+          >
+            Start Challenge
+            <ArrowRight className="size-4 ml-2" />
+          </Button>
+        </>
+        ) : countdown !== null && countdown >= 0 ? (
+          renderCountDown()
+        ) : showScore ? (
+          <div className="flex flex-col items-center justify-center bg-background">
+            <p className="text-4xl font-bold">{score} / {questions.length} in {(startTime ? Date.now() - startTime : 0) / 1000}s</p>
+
+            <ShareButton />
+          </div>
+        )
+          :
+          (
             <div>
               <p className="text-center mb-2">
                 Question {currentIndex + 1} / {questions.length}
               </p>
-              <p className="text-center mb-4">
+              <p className="text-center mb-4 text-3xl text-purple-600">
                 {questions[currentIndex].question}
               </p>
               <form onSubmit={handleSubmit} className="flex flex-col gap-2">
@@ -313,7 +334,7 @@ export function Challenge({ challenge, nickname, started, onStart }: { challenge
               <p className="mt-4 text-center">Time left: {timeLeft}s</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+      </CardContent>
+    </Card>
   );
 }
