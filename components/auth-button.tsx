@@ -3,6 +3,7 @@ import { Button } from "./ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "./logout-button";
 import { BarChart3 } from "lucide-react";
+import { ThemeSwitcher } from "./theme-switcher";
 
 export async function AuthButton() {
   const supabase = await createClient();
@@ -26,6 +27,7 @@ export async function AuthButton() {
       </Button>
 
       <LogoutButton />
+      <ThemeSwitcher />
     </div>
   ) : (
     <div className="flex gap-2">
@@ -35,6 +37,7 @@ export async function AuthButton() {
       <Button asChild size="sm" variant={"default"}>
         <Link href="/auth/sign-up">Sign up</Link>
       </Button>
+      <ThemeSwitcher />
     </div>
   );
 }
