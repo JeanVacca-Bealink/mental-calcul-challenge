@@ -202,7 +202,7 @@ export function Challenge({ challenge, nickname, started, onStart }: { challenge
           setIsStarted(false);
           onStart?.(false);
           persistChallenge(score, 0, questions.length);
-          router.push(`/score`);
+          setShowScore(true);
           return 0;
         }
         return t - 1;
